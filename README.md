@@ -4,4 +4,4 @@ Jelkonda is a system for development of [Jelka](https://jelka.fmf.uni-lj.si/abou
 
 # Setup
 
-Run 'setup.sh' to download necessary '.whl' files. This files should be hosted on a static web page server. All other files should also be available. 
+Run `setup.sh` to download necessary `.whl` files. These files should, along with all others, be hosted on a static web server. 
