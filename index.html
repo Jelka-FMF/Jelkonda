@@ -4,32 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jelka IDE</title>
-    
-    <!-- External Styles -->
     <link rel="stylesheet" href="style.css">
-
-    <!-- Dependencies -->
     <script src="positions.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 </head>
 <body>
-
-    <!-- Loading Overlay -->
     <div id="loader">
         <div class="spinner"></div>
         <div id="loader-text">Initializing Python Environment...</div>
     </div>
 
-    <!-- Top Navigation -->
     <div class="header">
         <div class="brand">🎄 Jelka IDE</div>
         <div class="controls">
-            <!-- File Inputs (Hidden) -->
             <input type="file" id="csvFile" accept=".csv" onchange="loadCSV(event)">
             <input type="file" id="pyFile" accept=".py" onchange="loadPython(event)">
             
-            <!-- Buttons -->
-            <button class="btn" onclick="document.getElementById('csvFile').click()" title="Load LED Positions">📁 Positions (.csv)</button>
+            <button class="btn" onclick="document.getElementById('csvFile').click()" title="Load LED Positions">📁 Import CSV</button>
             <button class="btn" onclick="document.getElementById('pyFile').click()" title="Open Python Script">📂 Open (.py)</button>
             <button class="btn" onclick="downloadCode()" title="Save current code to file">💾 Save (.py)</button>
             
@@ -45,19 +36,17 @@
         </div>
     </div>
 
-    <!-- Main Workspace -->
     <div class="main-container" id="main-container">
-        
         <!-- Editor Pane -->
         <div class="pane" id="left-pane">
             <div class="panel-header">pattern.py (Auto-saved)</div>
             <div id="monaco-container"></div>
+            
+            <!-- MOVED INSIDE LEFT PANE FOR BETTER POSITIONING -->
+            <div class="resizer-v" id="drag-v"></div>
         </div>
 
-        <!-- Vertical Resizer -->
-        <div class="resizer-v" id="drag-v"></div>
-
-        <!-- Visualization Pane -->
+        <!-- Right Pane -->
         <div class="pane" id="right-pane">
             <div id="vis-container">
                 <canvas id="canvas"></canvas>
@@ -74,7 +63,6 @@
         </div>
     </div>
 
-    <!-- Main Logic -->
     <script src="main.js"></script>
 </body>
 </html>

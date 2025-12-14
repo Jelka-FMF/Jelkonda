@@ -33,9 +33,7 @@ body {
 }
 
 .brand { font-weight: 600; color: #fff; font-size: 16px; margin-right: 20px; }
-
 .controls { display: flex; align-items: center; gap: 8px; }
-
 .divider { width: 1px; height: 24px; background: #555; margin: 0 4px; }
 
 .btn {
@@ -48,17 +46,15 @@ body {
     cursor: pointer;
     transition: background 0.2s;
 }
-
 .btn:hover:not(:disabled) { background: #4a4a4a; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
 .btn-run { background: var(--accent); color: white; }
 .btn-run:hover:not(:disabled) { background: var(--accent-hover); }
-
-.btn-stop { background: #8a2be2; /* Fallback */ background: #a1260d; color: white; }
+.btn-stop { background: #a1260d; color: white; }
 .btn-stop:hover:not(:disabled) { background: #c5221f; }
 
-#csvFile { display: none; }
+/* Hide File Inputs */
+#csvFile, #pyFile { display: none; }
 
 /* Layout */
 .main-container { display: flex; flex: 1; height: 100%; overflow: hidden; }
@@ -67,12 +63,49 @@ body {
 #left-pane { width: 50%; border-right: 1px solid var(--border); }
 #right-pane { flex: 1; display: flex; flex-direction: column; }
 
-/* Resizers */
-.resizer-v { width: 4px; cursor: col-resize; background: transparent; z-index: 10; position: absolute; right: -2px; top: 0; bottom: 0; }
-.resizer-h { height: 4px; cursor: row-resize; background: transparent; z-index: 10; margin-top: -2px; margin-bottom: -2px; }
-.resizer-v:hover, .resizer-h:hover { background: var(--accent); }
+/* --- UPDATED RESIZERS --- */
 
-/* Panels */
+/* Vertical Resizer (Code vs Visualizer) */
+.resizer-v { 
+    position: absolute; 
+    right: -6px;        /* Center the 12px hit box over the edge */
+    top: 0; 
+    bottom: 0; 
+    width: 12px;        /* Large hit area */
+    cursor: col-resize; 
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+}
+
+/* Horizontal Resizer (Visualizer vs Console) */
+.resizer-h { 
+    position: relative;
+    height: 12px;       /* Large hit area */
+    margin-top: -6px;   /* Pull up to overlap boundary */
+    margin-bottom: -6px;
+    cursor: row-resize; 
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Visual Lines on Hover (The actual blue line is thinner than the hit area) */
+.resizer-v::after, .resizer-h::after {
+    content: "";
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.resizer-v::after { width: 4px; height: 100%; }
+.resizer-h::after { height: 4px; width: 100%; }
+
+.resizer-v:hover::after, .resizer-h:hover::after {
+    background: var(--accent);
+}
+
+/* Components */
 .panel-header {
     background: var(--bg-panel);
     padding: 6px 15px;
@@ -95,16 +128,12 @@ body {
     align-items: center;
     justify-content: center;
 }
-
 canvas { width: 100%; height: 100%; cursor: grab; display: block; }
 canvas:active { cursor: grabbing; }
 
 .vis-hint {
-    position: absolute;
-    top: 10px; left: 10px;
-    font-size: 11px;
-    color: rgba(255,255,255,0.3);
-    pointer-events: none;
+    position: absolute; top: 10px; left: 10px;
+    font-size: 11px; color: rgba(255,255,255,0.3); pointer-events: none;
 }
 
 #console-container {
@@ -114,7 +143,6 @@ canvas:active { cursor: grabbing; }
     flex-direction: column;
     border-top: 1px solid var(--border);
 }
-
 #console-output {
     flex: 1;
     overflow-y: auto;
@@ -124,31 +152,22 @@ canvas:active { cursor: grabbing; }
     line-height: 1.4;
 }
 
-/* Console Colors */
-.log-line { margin-bottom: 2px; word-wrap: break-word; }
 .log-info { color: #d4d4d4; }
 .log-err { color: #f48771; }
 .log-sys { color: #569cd6; font-style: italic; }
 .log-success { color: #89d185; }
 
-/* Loader */
 #loader {
     position: fixed; inset: 0;
     background: rgba(30,30,30,0.95);
     z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
 }
 .spinner {
     width: 40px; height: 40px;
-    border: 3px solid #333;
-    border-top: 3px solid var(--accent);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 15px;
+    border: 3px solid #333; border-top: 3px solid var(--accent);
+    border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;
 }
 #loader-text { color: var(--text-muted); font-size: 14px; }
-
 @keyframes spin { to { transform: rotate(360deg); } }
