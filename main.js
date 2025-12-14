@@ -11,47 +11,30 @@ let isRunning = false;
 
 const STORAGE_KEY = 'jelka_saved_code';
 
-const defaultCode = `from jelka import Jelka
-import time
-import math
+const defaultCode = `import math
 
-# Initialize tree
-tree = Jelka()
-print(f"Connected to {len(tree)} LEDs")
+from jelka import Jelka
+from jelka.types import Color
 
-def hsv_to_rgb(h, s, v):
-    i = int(h * 6)
-    f = h * 6 - i
-    p = v * (1 - s)
-    q = v * (1 - f * s)
-    t = v * (1 - (1 - f) * s)
-    i = i % 6
-    if i == 0: return v, t, p
-    if i == 1: return q, v, p
-    if i == 2: return p, v, t
-    if i == 3: return p, q, v
-    if i == 4: return t, p, v
-    return v, p, q
 
-print("Starting Pattern...")
+def callback(jelka: Jelka):
+    for light, position in jelka.positions_normalized.items():
+        jelka.set_light(
+            light,
+            Color(
+                (position[0] * 255 + math.sin((jelka.elapsed_time + 1) / 4) * 255 + 256) % 256,
+                (position[1] * 255 + math.sin((jelka.elapsed_time + 2) / 4) * 255 + 256) % 256,
+                (position[2] * 255 + math.sin(jelka.elapsed_time / 4) * 255 + 256) % 256,
+            ).vivid(),
+        )
 
-offset = 0
-while True:
-    for i in range(len(tree)):
-        x, y, z = tree.positions[i]
-        
-        # Calculate hue based on height (z)
-        hue = (z * 0.01 + offset) % 1.0
-        
-        # Convert to RGB
-        r, g, b = hsv_to_rgb(hue, 1.0, 1.0)
-        
-        # Set Color (0-255)
-        tree[i] = (int(r*255), int(g*255), int(b*255))
-    
-    tree.show()
-    time.sleep(0.02)
-    offset += 0.005
+
+def main():
+    jelka = Jelka(60)
+    jelka.run(callback)
+
+
+main()
 `;
 
 // --- Monaco Editor ---
