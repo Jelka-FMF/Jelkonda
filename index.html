@@ -33,6 +33,7 @@
             
             <button class="btn" onclick="clearConsole()">Clear</button>
             <button class="btn" onclick="resetView()">Reset View</button>
+            <button class="btn" onclick="toggleDocs()" title="Pomoč">❓ Help</button>
         </div>
     </div>
 
@@ -63,6 +64,21 @@
         </div>
     </div>
 
+    <div id="doc-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>🎄 Jelkonda - Urejevalnik za FMF Jelko</h2>
+            <span class="close" onclick="toggleDocs()">&times;</span>
+        </div>
+        <div class="modal-body">
+            Jelkonda je urejevalnik za python za programiranje <a href="https://jelka.fmf.uni-lj.si/">programabilne jelke</a>, ki je postavljena na Fakuleteti za Matematiko in Fiziko Univerze v Ljubljani. 
+           
+            Knjižnica, ki jo lahko uporabljate je definirana v <a href="https://github.com/Jelka-FMF/JelkaPy">Github repozitoriju</a>. Za inspiracijo in dopolnitev nepopolne dokumentacije predlagamo ogled že <a href="https://github.com/Jelka-FMF/Storzi/tree/main/patterns"> narejenih vzorcev</a>.
+
+            Ko boste z vzorcem zadovoljni, ga lahko oddate s pomočjo PR zahteve na Github repozitoriju <a href="https://github.com/Jelka-FMF/Storzi">storži</a>, ali pa ga pošljete po e-mailu na naslov jk36975 afna student[pika]uni-lj[pika]si.
+        </div>
+    </div>
+</div>
     <script src="main.js"></script>
 </body>
 </html>

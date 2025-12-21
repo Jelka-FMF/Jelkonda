@@ -171,3 +171,94 @@ canvas:active { cursor: grabbing; }
 }
 #loader-text { color: var(--text-muted); font-size: 14px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Documentation Modal --- */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.6);
+    backdrop-filter: blur(2px);
+}
+
+.modal-content {
+    background-color: var(--bg-panel);
+    margin: 5% auto;
+    border: 1px solid var(--border);
+    width: 600px;
+    max-width: 90%;
+    max-height: 85vh;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    padding: 15px 20px;
+    background: #333;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 { font-size: 18px; color: white; margin: 0; }
+
+.close {
+    color: #aaa;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close:hover { color: white; }
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    color: var(--text);
+    line-height: 1.6;
+}
+
+.modal-body h3 {
+    margin-top: 20px; margin-bottom: 10px;
+    color: var(--accent-hover);
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+.modal-body h3:first-child { margin-top: 0; }
+
+.modal-body pre {
+    background: #111;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    color: #9cdcfe;
+    overflow-x: auto;
+}
+
+.modal-body ul { margin-left: 20px; }
+.modal-body li { margin-bottom: 8px; }
+.modal-body code {
+    background: #333;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    color: #dcdcaa;
+}
+
+.modal-body a {
+    color: #4fc1ff; /* Bright blue for dark mode visibility */
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.modal-body a:hover {
+    text-decoration: underline;
+    color: #9cdcfe;
+}

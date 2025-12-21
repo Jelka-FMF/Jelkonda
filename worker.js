@@ -7,83 +7,127 @@ self.pyPrint = function(text) {
     postMessage({type: "print", text: text});
 }
 
-self.pyRender = function(colorsProxy) {
-    const colors = colorsProxy.toJs();
-    colorsProxy.destroy();
-    postMessage({type: "render", colors: colors});
+
+self.pyRender = function(bytesProxy) {
+    // Convert Python bytes/bytearray to JS Uint8Array
+    const data = bytesProxy.toJs(); 
+    bytesProxy.destroy();
+    
+    // Transfer the buffer (zero-copy) to main thread
+    postMessage({type: "render", colors: data}, [data.buffer]);
 }
+
 
 async function initPyodideEnvironment() {
     try {
         pyodide = await loadPyodide();
-        
-        // 1. Fetch positions.csv from the server
-        // We do this before loading the library so the file exists when the library looks for it.
+
+        // 1. Fetch positions.csv
         try {
             const response = await fetch("positions.csv");
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const csvContent = await response.text();
-            
-            // Write to the root of the virtual filesystem (equivalent to ~/)
             pyodide.FS.writeFile("positions.csv", csvContent);
         } catch (err) {
-            postMessage({type: "print", text: "⚠️ Warning: Could not load positions.csv from server: " + err.message});
+            postMessage({type: "print", text: "⚠️ Warning: Could not load positions.csv: " + err.message});
         }
 
-        // 2. Load Micropip and Install Wheels
-        await pyodide.loadPackage("micropip");
+        // 2. PRE-LOAD Libraries
+        await pyodide.loadPackage(["micropip", "numpy", "packaging"]);
         const micropip = pyodide.pyimport("micropip");
-        
-        // Ensure these files exist in the same directory as worker.js
         await micropip.install("jelka_validator-1.0.2-py3-none-any.whl");
         await micropip.install("jelka-0.0.6-py3-none-any.whl");
 
-        // 3. Configure Environment & Patch Output Only
-        // We DO NOT patch load_positions anymore. The library will read the file we wrote above.
+        // 3. Configure Environment
         await pyodide.runPythonAsync(`
 import sys
 import time
 import js
-
-# Import the installed libraries
+import os
 import jelka
 import jelka_validator.datawriter
 
-# --- 1. Redirect Stdout ---
-class Console:
-    def write(self, t): js.pyPrint(t)
-    def flush(self): pass
-sys.stdout = Console()
-sys.stderr = Console()
+os.environ["JELKA_POSITIONS"] = "positions.csv"
+# --- 1. Time-Buffered Console ---
+# Collects all prints and sends them in a single batch max 10 times per second.
+class TimeBufferedConsole:
+    def __init__(self):
+        self.buffer = []
+        self.last_flush_time = 0
+        self.FLUSH_INTERVAL = 0.1  # 100ms = 10Hz
+        self.MAX_BUFFER_SIZE = 5000 # Safety valve to prevent OOM if spamming hard
+        
+    def write(self, t):
+        self.buffer.append(t)
+        # If buffer gets too big (e.g. 5000 chunks), force flush immediately
+        # to avoid crashing the worker memory
+        if len(self.buffer) > self.MAX_BUFFER_SIZE:
+            self._do_flush()
+            
+    def flush(self):
+        # Only send to JS if enough time has passed
+        now = time.time()
+        if now - self.last_flush_time >= self.FLUSH_INTERVAL:
+            self._do_flush()
+            
+    def _do_flush(self):
+        if not self.buffer: return
+        
+        # Combine all strings
+        full_text = "".join(self.buffer)
+        js.pyPrint(full_text)
+        
+        # Clear
+        self.buffer = []
+        self.last_flush_time = time.time()
 
-# --- 2. Synchronous Sleep ---
+# Replace sys.stdout and stderr
+sys.stdout = TimeBufferedConsole()
+sys.stderr = sys.stdout 
+
+# --- 2. Patch Micropip (Performance) ---
+import micropip
+original_install = micropip.install
+async def fast_install(packages, **kwargs):
+    # Optimization: if already loaded by worker init, skip the slow checks
+    try:
+        await original_install(packages, **kwargs)
+    except Exception as e:
+        print(f"Package load warning: {e}")
+micropip.install = fast_install
+
+# --- 3. Synchronous Sleep ---
 def sync_sleep(sec):
     start = time.time()
-    while time.time() - start < sec: pass
+    while time.time() - start < sec: pass 
 time.sleep = sync_sleep
 
-# --- 3. Patch DataWriter (Output) ---
-# We MUST patch this to redirect the light data to the browser canvas 
-# instead of trying to write to a real hardware controller.
+# --- 4. Optimized DataWriter ---
 class BrowserDataWriter:
     def __init__(self, number_of_lights):
         pass
-        
-    def write_frame(self, frame_data):
-        # frame_data is a list of objects (likely Color namedtuples or similar)
-        # Flatten for JS transfer: [r, g, b, r, g, b...]
-        flat = []
-        for color in frame_data:
-            # Assuming color is iterable (tuple/list)
-            flat.extend(color)
-        js.pyRender(flat)
 
-# Replace the class in the module
+    def write_frame(self, frame_data):
+        # frame_data is a list of Color(r,g,b).
+        # We construct a single bytearray. This is much faster to marshal 
+        # to JS than a list of 180 integers.
+        
+        flat_bytes = bytearray()
+        for color in frame_data:
+            flat_bytes.extend(color)
+            
+        # Send binary data
+        js.pyRender(flat_bytes)
+        
+        # Flush console (time-gated)
+        sys.stdout.flush()
+
+# Replace the class
 jelka_validator.datawriter.DataWriter = BrowserDataWriter
 
-print("[System] Environment Ready. Loaded positions.csv to virtual filesystem.")
+print("[System] Environment Ready (Numpy Pre-loaded).")
         `);
-        
+
         postMessage({type: 'ready'});
 
     } catch (e) {
@@ -91,17 +135,11 @@ print("[System] Environment Ready. Loaded positions.csv to virtual filesystem.")
     }
 }
 
-// Start loading
 initPyodideEnvironment();
 
-// --- Message Handling ---
 self.onmessage = async (e) => {
     const msg = e.data;
-    
     if (msg.cmd === 'init') {
-        // We don't need to do anything with the positions passed from JS anymore,
-        // because Python now reads the CSV file directly.
-        // We just signal completion.
         postMessage({type: 'init_complete'});
     }
     else if (msg.cmd === 'run') {

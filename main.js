@@ -37,10 +37,101 @@ def main():
 main()
 `;
 
+// --- Documentation Toggle ---
+function toggleDocs() {
+    const modal = document.getElementById('doc-modal');
+    if (modal.style.display === 'none') {
+        modal.style.display = 'block';
+    } else {
+        modal.style.display = 'none';
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('doc-modal');
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
+
 // --- Monaco Editor ---
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+// --- Monaco Editor & Autocomplete ---
 require(['vs/editor/editor.main'], function() {
-    
+
+    // 1. Register Custom Completion Provider for Python
+    monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: function(model, position) {
+            const word = model.getWordUntilPosition(position);
+            const range = {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: word.startColumn,
+                endColumn: word.endColumn
+            };
+
+            const suggestions = [
+                // Jelka Specific
+                {
+                    label: 'jelka',
+                    kind: monaco.languages.CompletionItemKind.Variable,
+                    documentation: 'The main Jelka controller instance',
+                    insertText: 'jelka',
+                    range: range
+                },
+                {
+                    label: 'set_light',
+                    kind: monaco.languages.CompletionItemKind.Method,
+                    documentation: 'Set a light color: jelka.set_light(index, color)',
+                    insertText: 'set_light(${1:index}, ${2:color})',
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    range: range
+                },
+                {
+                    label: 'run',
+                    kind: monaco.languages.CompletionItemKind.Method,
+                    documentation: 'Start the simulation loop: jelka.run(callback)',
+                    insertText: 'run(${1:callback})',
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    range: range
+                },
+                {
+                    label: 'Color',
+                    kind: monaco.languages.CompletionItemKind.Class,
+                    documentation: 'Color(r, g, b)',
+                    insertText: 'Color(${1:r}, ${2:g}, ${3:b})',
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    range: range
+                },
+                {
+                    label: 'positions_normalized',
+                    kind: monaco.languages.CompletionItemKind.Property,
+                    documentation: 'Dictionary of LED positions {0: (x,y,z)...}',
+                    insertText: 'positions_normalized',
+                    range: range
+                },
+                // Python Basics (Standard library overrides)
+                {
+                    label: 'import numpy',
+                    kind: monaco.languages.CompletionItemKind.Snippet,
+                    insertText: 'import numpy as np',
+                    range: range
+                },
+                {
+                    label: 'print',
+                    kind: monaco.languages.CompletionItemKind.Function,
+                    insertText: 'print(${1:msg})',
+                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                    range: range
+                }
+            ];
+
+            return { suggestions: suggestions };
+        }
+    });
+
+    // 2. Create Editor (Existing Code)
     // Check Local Storage for saved code
     let initialCode = defaultCode;
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -53,7 +144,8 @@ require(['vs/editor/editor.main'], function() {
         language: 'python',
         theme: 'vs-dark',
         automaticLayout: false,
-        minimap: { enabled: false }
+        minimap: { enabled: false },
+        suggestOnTriggerCharacters: true
     });
 
     // Auto-save on change
@@ -61,7 +153,6 @@ require(['vs/editor/editor.main'], function() {
         localStorage.setItem(STORAGE_KEY, editor.getValue());
     });
 });
-
 // --- File Operations ---
 
 function downloadCode() {
@@ -119,6 +210,7 @@ async function loadCSV(event) {
     event.target.value = '';
 }
 
+let animationId = null;
 
 // --- Worker Management ---
 function initWorker() {
@@ -127,48 +219,64 @@ function initWorker() {
     workerReady = false;
     worker = new Worker('worker.js');
 
-    worker.onmessage = (e) => {
-        const msg = e.data;
+worker.onmessage = (e) => {
+    const msg = e.data;
 
-        switch(msg.type) {
-            case 'ready':
-                // Worker loaded, send positions immediately
-                updateWorkerPositions(); 
-                break;
+    switch(msg.type) {
+        case 'ready':
+            updateWorkerPositions();
+            break;
 
-            case 'init_complete':
-                workerReady = true;
-                document.getElementById('loader').style.display = 'none';
-                document.getElementById('btn-run').disabled = false;
-                
-                // Process queue if user clicked Run during restart
-                if (pendingRunCode) {
-                    executeRun(pendingRunCode);
-                    pendingRunCode = null;
-                }
-                break;
+        case 'init_complete':
+            workerReady = true;
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('btn-run').disabled = false;
+            if (pendingRunCode) {
+                executeRun(pendingRunCode);
+                pendingRunCode = null;
+            }
+            break;
 
-            case 'print':
-                log(msg.text);
-                break;
+        case 'print':
+            log(msg.text);
+            break;
 
-            case 'render':
-                // Update 3D view buffer
-                colorStates = msg.colors;
-                requestAnimationFrame(renderFrame);
-                break;
+        case 'render':
+            // JUST update the data. Do NOT trigger a render here.
+            // This prevents the "Message Flooding" crash.
+            colorStates = msg.colors;
+            break;
 
-            case 'error':
-                log(msg.text, 'err');
-                setUIState('stopped');
-                break;
+        case 'error':
+            log(msg.text, 'err');
+            stopPattern(msg.text); // Helper to stop safely
+            break;
 
-            case 'finished':
-                log("Script finished.", 'success');
-                setUIState('stopped');
-                break;
-        }
-    };
+        case 'finished':
+            log("Script finished.", 'success');
+            stopPattern();
+            break;
+    }
+};    
+}
+
+// 2. Independent Render Loop (Max 60 FPS)
+function startRenderLoop() {
+    if (!animationId) {
+        animationId = requestAnimationFrame(renderLoop);
+    }
+}
+
+function stopRenderLoop() {
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
+}
+
+function renderLoop() {
+    renderFrame(); // Draw whatever is in 'colorStates' right now
+    animationId = requestAnimationFrame(renderLoop);
 }
 
 function updateWorkerPositions() {
@@ -180,7 +288,8 @@ function updateWorkerPositions() {
 function runPattern() {
     const code = editor.getValue();
     setUIState('running');
-    
+    startRenderLoop(); // <--- Start rendering
+
     if (workerReady) {
         executeRun(code);
     } else {
@@ -197,17 +306,14 @@ function executeRun(code) {
 
 function stopPattern(reason = null) {
     if (!isRunning) return;
-
     if (reason) log(reason, 'sys');
     else log("--- Stopped ---", 'sys');
-    
-    // Terminate worker to stop infinite loops
+
     if (worker) worker.terminate();
-    
+    stopRenderLoop(); // <--- Stop rendering to save battery
+
     setUIState('stopped');
     workerReady = false;
-    
-    // Immediately start a fresh worker
     initWorker();
 }
 
@@ -236,17 +342,54 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-function log(text, type = 'info') {
-    if(!text || text === '\n') return;
-    const el = document.getElementById('console-output');
-    const div = document.createElement('div');
-    div.className = `log-line log-${type}`;
-    div.textContent = `> ${text}`;
-    el.appendChild(div);
-    el.scrollTop = el.scrollHeight;
+const consoleContainer = document.getElementById('console-output');
+const MAX_LOG_LINES = 300; // Limit history to prevent browser slowdown
+
+// Buffer for UI updates
+let logBuffer = document.createDocumentFragment();
+let isLogPending = false;
+
+function flushLogs() {
+    if (!consoleContainer) return;
+    
+    // Append new logs
+    consoleContainer.appendChild(logBuffer);
+    
+    // Create a new fragment for next batch
+    logBuffer = document.createDocumentFragment();
+    isLogPending = false;
+
+    // Prune old logs to keep DOM light
+    while (consoleContainer.childNodes.length > MAX_LOG_LINES) {
+        consoleContainer.removeChild(consoleContainer.firstChild);
+    }
+    
+    // Auto scroll
+    consoleContainer.scrollTop = consoleContainer.scrollHeight;
 }
 
-function clearConsole() {
+function log(text, type = 'info') {
+    if (!text) return;
+
+    // Handle newlines coming from Python prints correctly
+    // Python often sends "Line\n", we want to split that.
+    const lines = text.split('\n');
+
+    lines.forEach(line => {
+        if (line.length === 0) return;
+        
+        const div = document.createElement('div');
+        div.className = `log-line log-${type}`;
+        div.textContent = line.startsWith('>') ? line : `> ${line}`;
+        logBuffer.appendChild(div);
+    });
+
+    // Schedule a UI update only if one isn't already pending
+    if (!isLogPending) {
+        isLogPending = true;
+        requestAnimationFrame(flushLogs);
+    }
+}function clearConsole() {
     document.getElementById('console-output').innerHTML = '';
 }
 
@@ -283,51 +426,60 @@ function project3D(x, y, z) {
     return { x: x1, y: y2, z: z2 };
 }
 
+const TWO_PI = Math.PI * 2; // Pre-calculate constant
+
 function renderFrame() {
+    // Use clearRect instead of fillRect for potentially faster clear, 
+    // but fillRect #111 is fine for style.
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const cx = canvas.width / 2;
-    const cy = canvas.height * 0.6; 
-    
+    const cy = canvas.height * 0.6;
+
     const posValues = Object.values(positions);
     if(posValues.length === 0) return;
 
     // Calculate projected points
     const points = posValues.map((p, i) => {
         const proj = project3D(p.x, p.y, p.z);
-        const r = colorStates[i*3] || 0;
-        const g = colorStates[i*3+1] || 0;
-        const b = colorStates[i*3+2] || 0;
-        
+        // Using bitwise OR (| 0) to force integer read is slightly faster
+        const r = colorStates[i*3] | 0;
+        const g = colorStates[i*3+1] | 0;
+        const b = colorStates[i*3+2] | 0;
+
         return { x: proj.x, y: proj.y, z: proj.z, r, g, b };
     });
 
-    // Sort by depth (Y) for painter's algorithm
+    // Sort by depth (Y)
     points.sort((a, b) => b.y - a.y);
 
     points.forEach(p => {
         const fov = 800;
         const scale = (fov / (fov - p.y + 400)) * view.zoom;
-        const sx = cx + p.x * scale;
-        const sy = cy - p.z * scale; 
-
+        
+        // Bitwise floor (| 0) aligns to pixels, which is faster for Canvas 
+        const sx = (cx + p.x * scale) | 0;
+        const sy = (cy - p.z * scale) | 0;
+        
+        // Ensure size is at least 1
         const size = Math.max(1, view.lightSize * (scale / view.zoom));
 
         ctx.beginPath();
-        ctx.arc(sx, sy, size, 0, Math.PI * 2);
+        ctx.arc(sx, sy, size, 0, TWO_PI);
 
+        // --- PERFORMANCE FIX: REMOVED SHADOW BLUR ---
+        // Shadows are extremely expensive. We use a flat color.
+        // If you need "glow", draw the circle slightly larger with low opacity 
+        // instead of using ctx.shadowBlur.
+        
         if (p.r > 10 || p.g > 10 || p.b > 10) {
-            const color = `rgb(${p.r}, ${p.g}, ${p.b})`;
-            ctx.fillStyle = color;
-            ctx.shadowBlur = size * 2;
-            ctx.shadowColor = color;
+            ctx.fillStyle = `rgb(${p.r}, ${p.g}, ${p.b})`;
         } else {
             ctx.fillStyle = '#333';
-            ctx.shadowBlur = 0;
         }
+        
         ctx.fill();
-        ctx.shadowBlur = 0;
     });
 }
 
@@ -391,7 +543,6 @@ function onMoveV(e) {
 const dragH = document.getElementById('drag-h');
 const rightPane = document.getElementById('right-pane');
 const visContainer = document.getElementById('vis-container');
-const consoleContainer = document.getElementById('console-container');
 
 dragH.addEventListener('mousedown', (e) => {
     e.preventDefault();
