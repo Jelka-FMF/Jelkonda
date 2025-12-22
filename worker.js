@@ -1,4 +1,4 @@
-importScripts("https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js");
+importScripts("https://cdn.jsdelivr.net/pyodide/v0.29.0/full/pyodide.js");
 
 let pyodide = null;
 
@@ -54,36 +54,34 @@ class TimeBufferedConsole:
     def __init__(self):
         self.buffer = []
         self.last_flush_time = 0
-        self.FLUSH_INTERVAL = 0.1  # 100ms = 10Hz
-        self.MAX_BUFFER_SIZE = 5000 # Safety valve to prevent OOM if spamming hard
+        self.FLUSH_INTERVAL = 0.1  # 10Hz
+        self.MAX_BUFFER_SIZE = 5000
         
     def write(self, t):
         self.buffer.append(t)
-        # If buffer gets too big (e.g. 5000 chunks), force flush immediately
-        # to avoid crashing the worker memory
         if len(self.buffer) > self.MAX_BUFFER_SIZE:
-            self._do_flush()
+            self.force_flush()
             
     def flush(self):
-        # Only send to JS if enough time has passed
+        # Time-gated flush (called automatically by print)
+        # We ignore this most of the time to prevent UI freezing
         now = time.time()
         if now - self.last_flush_time >= self.FLUSH_INTERVAL:
-            self._do_flush()
+            self.force_flush()
             
-    def _do_flush(self):
+    def force_flush(self):
+        # Immediate flush (called at end of script)
         if not self.buffer: return
         
-        # Combine all strings
         full_text = "".join(self.buffer)
         js.pyPrint(full_text)
         
-        # Clear
         self.buffer = []
         self.last_flush_time = time.time()
 
 # Replace sys.stdout and stderr
 sys.stdout = TimeBufferedConsole()
-sys.stderr = sys.stdout 
+sys.stderr = sys.stdout
 
 # --- 2. Patch Micropip (Performance) ---
 import micropip
@@ -105,24 +103,26 @@ time.sleep = sync_sleep
 # --- 4. Optimized DataWriter ---
 class BrowserDataWriter:
     def __init__(self, number_of_lights):
-        pass
+        self.last_frame_time = 0
+        self.target_frame_time = 1.0 / 60.0
 
     def write_frame(self, frame_data):
-        # frame_data is a list of Color(r,g,b).
-        # We construct a single bytearray. This is much faster to marshal 
-        # to JS than a list of 180 integers.
-        
         flat_bytes = bytearray()
         for color in frame_data:
             flat_bytes.extend(color)
             
-        # Send binary data
         js.pyRender(flat_bytes)
         
-        # Flush console (time-gated)
+        # Try to flush logs (rate limited)
         sys.stdout.flush()
 
-# Replace the class
+        # Blocking Delay
+        now = time.time()
+        elapsed = now - self.last_frame_time
+        if elapsed < self.target_frame_time:
+            time.sleep(self.target_frame_time - elapsed)
+        self.last_frame_time = time.time()
+
 jelka_validator.datawriter.DataWriter = BrowserDataWriter
 
 print("[System] Environment Ready (Numpy Pre-loaded).")
@@ -146,6 +146,15 @@ self.onmessage = async (e) => {
         if (!pyodide) return;
         try {
             await pyodide.runPythonAsync(msg.code);
+            
+            // --- FIX IS HERE ---
+            // Force flush stdout/stderr to ensure final prints are shown
+            await pyodide.runPythonAsync(`
+import sys
+if hasattr(sys.stdout, 'force_flush'): sys.stdout.force_flush()
+if hasattr(sys.stderr, 'force_flush'): sys.stderr.force_flush()
+            `);
+            
             postMessage({type: 'finished'});
         } catch (err) {
             if (!err.toString().includes("KeyboardInterrupt")) {
