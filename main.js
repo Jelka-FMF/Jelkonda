@@ -55,14 +55,84 @@ window.onclick = function(event) {
     }
 }
 
+// --- LSP Manager ---
+let lspWorker = null;
+let lspReady = false;
+let msgId = 0;
+const pendingRequests = new Map();
+const LSP_TIMEOUT_MS = 10000; // 4 seconds max wait time
+
+const statusDot = document.getElementById('lsp-status');
+
+function updateLspStatus(state) {
+    if (!statusDot) return;
+    switch(state) {
+        case 'init': statusDot.style.background = '#666'; break; // Grey
+        case 'ready': statusDot.style.background = '#4CAF50'; break; // Green
+        case 'busy': statusDot.style.background = '#FFC107'; break; // Yellow
+        case 'error': statusDot.style.background = '#F44336'; break; // Red
+    }
+}
+
+function initLsp() {
+    if (lspWorker) lspWorker.terminate();
+
+    updateLspStatus('init');
+    console.log("[LSP] Starting Worker...");
+    
+    lspWorker = new Worker('lspWorker.js');
+
+    // 1. Handle Global Worker Errors (Crashes)
+    lspWorker.onerror = (err) => {
+        console.error("[LSP Worker Crash]", err);
+        updateLspStatus('error');
+        lspReady = false;
+    };
+
+    // 2. Handle Messages
+    lspWorker.onmessage = (e) => {
+        const data = e.data;
+
+        if (data.type === 'ready') {
+            lspReady = true;
+            updateLspStatus('ready');
+            console.log("[LSP] Ready.");
+            return;
+        }
+
+        if (data.id !== undefined && pendingRequests.has(data.id)) {
+            const req = pendingRequests.get(data.id);
+            clearTimeout(req.timer); // Stop the timeout clock
+            req.callback(data.results || []);
+            pendingRequests.delete(data.id);
+            
+            // Only go back to green if queue is empty
+            if (pendingRequests.size === 0) updateLspStatus('ready');
+        }
+    };
+}
+
+// Global function to restart manually if stuck
+window.restartLsp = function() {
+    console.warn("[LSP] Manual Restart Triggered");
+    pendingRequests.forEach(req => clearTimeout(req.timer));
+    pendingRequests.clear();
+    initLsp();
+}
+
+// Initialize on load
+initLsp();
+
 // --- Monaco Editor ---
 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
 // --- Monaco Editor & Autocomplete ---
 require(['vs/editor/editor.main'], function() {
-
-    // 1. Register Custom Completion Provider for Python
     monaco.languages.registerCompletionItemProvider('python', {
+        triggerCharacters: ['.', ' '],
         provideCompletionItems: function(model, position) {
+            // Fail fast if worker is dead
+            if (!lspReady) return { suggestions: [] };
+
             const word = model.getWordUntilPosition(position);
             const range = {
                 startLineNumber: position.lineNumber,
@@ -71,66 +141,57 @@ require(['vs/editor/editor.main'], function() {
                 endColumn: word.endColumn
             };
 
-            const suggestions = [
-                // Jelka Specific
-                {
-                    label: 'jelka',
-                    kind: monaco.languages.CompletionItemKind.Variable,
-                    documentation: 'The main Jelka controller instance',
-                    insertText: 'jelka',
-                    range: range
-                },
-                {
-                    label: 'set_light',
-                    kind: monaco.languages.CompletionItemKind.Method,
-                    documentation: 'Set a light color: jelka.set_light(index, color)',
-                    insertText: 'set_light(${1:index}, ${2:color})',
-                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                    range: range
-                },
-                {
-                    label: 'run',
-                    kind: monaco.languages.CompletionItemKind.Method,
-                    documentation: 'Start the simulation loop: jelka.run(callback)',
-                    insertText: 'run(${1:callback})',
-                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                    range: range
-                },
-                {
-                    label: 'Color',
-                    kind: monaco.languages.CompletionItemKind.Class,
-                    documentation: 'Color(r, g, b)',
-                    insertText: 'Color(${1:r}, ${2:g}, ${3:b})',
-                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                    range: range
-                },
-                {
-                    label: 'positions_normalized',
-                    kind: monaco.languages.CompletionItemKind.Property,
-                    documentation: 'Dictionary of LED positions {0: (x,y,z)...}',
-                    insertText: 'positions_normalized',
-                    range: range
-                },
-                // Python Basics (Standard library overrides)
-                {
-                    label: 'import numpy',
-                    kind: monaco.languages.CompletionItemKind.Snippet,
-                    insertText: 'import numpy as np',
-                    range: range
-                },
-                {
-                    label: 'print',
-                    kind: monaco.languages.CompletionItemKind.Function,
-                    insertText: 'print(${1:msg})',
-                    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                    range: range
-                }
-            ];
+            updateLspStatus('busy');
 
-            return { suggestions: suggestions };
+            return new Promise((resolve) => {
+                const reqId = msgId++;
+                
+                // 1. TIMEOUT HANDLER (The Debug Fix)
+                // If worker doesn't reply in 4s, we assume it's stuck.
+                const timer = setTimeout(() => {
+                    if (pendingRequests.has(reqId)) {
+                        console.error(`[LSP] Request ${reqId} timed out! Worker might be stuck.`);
+                        updateLspStatus('error');
+                        pendingRequests.delete(reqId);
+                        resolve({ suggestions: [] }); // Unblock Editor
+                    }
+                }, LSP_TIMEOUT_MS);
+
+                // 2. SUCCESS HANDLER
+                const callback = (rawItems) => {
+                    const suggestions = rawItems.map(item => ({
+                        label: item.label,
+                        kind: item.kind,
+                        
+                        // Shows the signature (e.g. "def run(callback)") next to the item
+                        detail: item.detail, 
+                        
+                        // Shows the full docstring in the side panel
+                        documentation: {
+                            value: item.documentation || "No documentation" 
+                        },
+                        
+                        insertText: item.insertText,
+                        sortText: '0_' + item.label,
+                        range: range
+                    }));
+                    resolve({ suggestions: suggestions });
+                }; 
+
+                // Store request
+                pendingRequests.set(reqId, { callback, timer });
+
+                // Send
+                lspWorker.postMessage({
+                    id: reqId,
+                    type: 'completion',
+                    code: model.getValue(),
+                    line: position.lineNumber,
+                    column: position.column - 1
+                });
+            });
         }
     });
-
     // 2. Create Editor (Existing Code)
     // Check Local Storage for saved code
     let initialCode = defaultCode;
