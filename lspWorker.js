@@ -9,18 +9,24 @@ self.onerror = function(e) {
 function log(msg) {
     console.log(`[LSP Worker] ${msg}`);
 }
-
 async function initLsp() {
     try {
         log("Initializing...");
         pyodide = await loadPyodide();
 
+        // Fetch config
+        const libsResponse = await fetch("libraries.json");
+        const libs = await libsResponse.json();
+
+        // Install Dependencies
         await pyodide.loadPackage(["micropip", "numpy"]);
         const micropip = pyodide.pyimport("micropip");
         
         await micropip.install("jedi");
-        await micropip.install("jelka-0.0.6-py3-none-any.whl");
-
+        
+        // Install Dynamic versions
+        if (libs.jelka_validator) await micropip.install(libs.jelka_validator);
+        if (libs.jelka) await micropip.install(libs.jelka);
         await pyodide.runPythonAsync(`
 import jedi
 import json

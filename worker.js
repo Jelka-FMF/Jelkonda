@@ -17,27 +17,34 @@ self.pyRender = function(bytesProxy) {
     postMessage({type: "render", colors: data}, [data.buffer]);
 }
 
-
 async function initPyodideEnvironment() {
     try {
         pyodide = await loadPyodide();
 
-        // 1. Fetch positions.csv
-        try {
-            const response = await fetch("positions.csv");
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const csvContent = await response.text();
-            pyodide.FS.writeFile("positions.csv", csvContent);
-        } catch (err) {
-            postMessage({type: "print", text: "⚠️ Warning: Could not load positions.csv: " + err.message});
-        }
+        // 1. Fetch Configuration & Data in parallel
+        const [posResponse, libsResponse] = await Promise.all([
+            fetch("positions.csv"),
+            fetch("libraries.json")
+        ]);
 
-        // 2. PRE-LOAD Libraries
+        if (!posResponse.ok) console.warn("Missing positions.csv");
+        if (!libsResponse.ok) throw new Error("Missing libraries.json - Run update_libs.py!");
+
+        const csvContent = await posResponse.text();
+        const libs = await libsResponse.json();
+
+        // Write CSV to FS
+        pyodide.FS.writeFile("positions.csv", csvContent);
+
+        // 2. Load Libraries
+        // Load numpy first (standard)
         await pyodide.loadPackage(["micropip", "numpy", "packaging"]);
         const micropip = pyodide.pyimport("micropip");
-        await micropip.install("jelka_validator-1.0.2-py3-none-any.whl");
-        await micropip.install("jelka-0.0.6-py3-none-any.whl");
-
+        
+        // Install Jelka wheels from configuration
+        // We look for 'jelka_validator' and 'jelka' keys in the JSON
+        if (libs.jelka_validator) await micropip.install(libs.jelka_validator);
+        if (libs.jelka) await micropip.install(libs.jelka);
         // 3. Configure Environment
         await pyodide.runPythonAsync(`
 import sys
