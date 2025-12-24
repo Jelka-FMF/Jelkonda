@@ -88,7 +88,6 @@ class TimeBufferedConsole:
 
 # Replace sys.stdout and stderr
 sys.stdout = TimeBufferedConsole()
-sys.stderr = sys.stdout
 
 # --- 2. Patch Micropip (Performance) ---
 import micropip

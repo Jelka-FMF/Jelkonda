@@ -310,7 +310,7 @@ worker.onmessage = (e) => {
 
         case 'error':
             log(msg.text, 'err');
-            stopPattern(msg.text); // Helper to stop safely
+            stopPattern(); 
             break;
 
         case 'finished':
