@@ -1,2 +1,6 @@
 *.whl
 libraries.json
+uv.lock
+pyproject.toml
+submissions
+.python-version
