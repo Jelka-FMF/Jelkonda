@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jelkonda</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css">
     <link rel="stylesheet" href="style.css">
     <script src="positions.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
@@ -15,25 +17,38 @@
     </div>
 
     <div class="header">
-        <div class="brand">🎄 Jelkonda</div>
+        <div class="brand">
+            <img src="favicon.svg" alt="" class="brand-logo">
+            Jelkonda
+        </div>
         <div class="controls">
             <input type="file" id="csvFile" accept=".csv" onchange="loadCSV(event)">
             <input type="file" id="pyFile" accept=".py" onchange="loadPython(event)">
-            
-            <button class="btn" onclick="document.getElementById('csvFile').click()" title="Load LED Positions">📁 Import CSV</button>
-            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Open Python Script">📂 Open (.py)</button>
-            <button class="btn" onclick="downloadCode()" title="Save current code to file">💾 Save (.py)</button>
-            
+
+            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Open a Python script">
+                <i class="codicon codicon-folder-opened"></i>Open
+            </button>
+            <button class="btn" onclick="downloadCode()" title="Download the current code as pattern.py">
+                <i class="codicon codicon-save"></i>Save
+            </button>
+
             <div class="divider"></div>
-            
-            <button id="btn-run" class="btn btn-run" onclick="runPattern()" disabled>▶ Run</button>
-            <button id="btn-stop" class="btn btn-stop" onclick="stopPattern()" disabled>⏹ Stop</button>
-            
+
+            <button id="btn-run" class="btn btn-run" onclick="runPattern()" title="Run (Ctrl/Cmd+Enter)" disabled>
+                <i class="codicon codicon-play"></i>Run
+            </button>
+            <button id="btn-stop" class="btn btn-stop" onclick="stopPattern()" title="Stop (Ctrl/Cmd+Enter)" disabled>
+                <i class="codicon codicon-debug-stop"></i>Stop
+            </button>
+
             <div class="divider"></div>
-            
-            <button class="btn" onclick="clearConsole()">Clear</button>
-            <button class="btn" onclick="resetView()">Reset View</button>
-            <button class="btn" onclick="toggleDocs()" title="Pomoč">❓ Help</button>
+
+            <button class="btn" onclick="resetView()" title="Reset the camera to the default angle and zoom">
+                <i class="codicon codicon-screen-normal"></i>Reset view
+            </button>
+            <button class="btn btn-icon" onclick="toggleDocs()" title="Help">
+                <i class="codicon codicon-question"></i>
+            </button>
         </div>
     </div>
 
@@ -41,9 +56,13 @@
         <!-- Editor Pane -->
         <div class="pane" id="left-pane">
             <div class="panel-header">
-                pattern.py (Auto-saved)
-                <span id="lsp-status" title="LSP Status: Grey=Loading, Green=Ready, Yellow=Busy, Red=Error"></span>
-                <button id="lsp-restart" onclick="restartLsp()" title="Restart the code-completion engine">↺ LSP</button>
+                <span class="panel-title">pattern.py <span class="panel-note">auto-saved</span></span>
+                <span class="panel-actions">
+                    <span id="lsp-status" class="status-dot" title="Code completion: loading"></span>
+                    <button class="icon-btn" onclick="restartLsp()" title="Restart code completion (LSP)">
+                        <i class="codicon codicon-debug-restart"></i>LSP
+                    </button>
+                </span>
             </div>
             <div id="monaco-container"></div>
 
@@ -54,34 +73,62 @@
         <div class="pane" id="right-pane">
             <div id="vis-container">
                 <canvas id="canvas"></canvas>
-                <div class="vis-hint">Left Click: Rotate • Right Click/Scroll: Zoom</div>
+                <div class="vis-hint">Drag to rotate · Scroll to zoom</div>
             </div>
-            
+
             <!-- Horizontal Resizer -->
             <div class="resizer-h" id="drag-h"></div>
-            
+
             <div id="console-container">
-                <div class="panel-header">Terminal Output</div>
+                <div class="panel-header">
+                    <span class="panel-title">Terminal</span>
+                    <span class="panel-actions">
+                        <button class="icon-btn" onclick="clearConsole()" title="Clear the terminal">
+                            <i class="codicon codicon-clear-all"></i>
+                        </button>
+                        <span id="py-status" class="status-dot" title="Python: loading"></span>
+                        <button class="icon-btn" onclick="restartPython()" title="Restart the Python environment">
+                            <i class="codicon codicon-debug-restart"></i>Python
+                        </button>
+                    </span>
+                </div>
                 <div id="console-output"></div>
             </div>
         </div>
     </div>
 
     <div id="doc-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>🎄 Jelkonda - Urejevalnik za FMF Jelko</h2>
-            <span class="close" onclick="toggleDocs()">&times;</span>
-        </div>
-        <div class="modal-body">
-            Jelkonda je urejevalnik za python za programiranje <a href="https://jelka.fmf.uni-lj.si/">programabilne jelke</a>, ki je postavljena na Fakuleteti za Matematiko in Fiziko Univerze v Ljubljani. 
-           
-            Knjižnica, ki jo lahko uporabljate je definirana v <a href="https://github.com/Jelka-FMF/JelkaPy">Github repozitoriju</a>. Za inspiracijo in dopolnitev nepopolne dokumentacije predlagamo ogled že <a href="https://github.com/Jelka-FMF/Storzi/tree/main/patterns"> narejenih vzorcev</a>.
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><img src="favicon.svg" alt="" class="brand-logo">Jelkonda - Urejevalnik za FMF Jelko</h2>
+                <button class="icon-btn close" onclick="toggleDocs()" title="Close">
+                    <i class="codicon codicon-close"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    Jelkonda je urejevalnik za python za programiranje <a href="https://jelka.fmf.uni-lj.si/">programabilne jelke</a>, ki je postavljena na Fakuleteti za Matematiko in Fiziko Univerze v Ljubljani.
+                </p>
+                <p>
+                    Knjižnica, ki jo lahko uporabljate je definirana v <a href="https://github.com/Jelka-FMF/JelkaPy">Github repozitoriju</a>. Za inspiracijo in dopolnitev nepopolne dokumentacije predlagamo ogled že <a href="https://github.com/Jelka-FMF/Storzi/tree/main/patterns">narejenih vzorcev</a>.
+                </p>
+                <p>
+                    Ko boste z vzorcem zadovoljni, ga lahko oddate s pomočjo PR zahteve na Github repozitoriju <a href="https://github.com/Jelka-FMF/Storzi">storži</a>, ali pa ga pošljete po e-mailu na naslov jk36975 afna student[pika]uni-lj[pika]si.
+                </p>
 
-            Ko boste z vzorcem zadovoljni, ga lahko oddate s pomočjo PR zahteve na Github repozitoriju <a href="https://github.com/Jelka-FMF/Storzi">storži</a>, ali pa ga pošljete po e-mailu na naslov jk36975 afna student[pika]uni-lj[pika]si.
+                <h3>Napredno</h3>
+                <div class="setting">
+                    <div>
+                        <div class="setting-title">Pozicije lučk</div>
+                        <div class="setting-desc">Uvozi CSV datoteko z vrsticami oblike <code>indeks,x,y,z</code>. Privzeto se uporabljajo pozicije FMF jelke.</div>
+                    </div>
+                    <button class="btn" onclick="document.getElementById('csvFile').click()">
+                        <i class="codicon codicon-cloud-upload"></i>Uvozi CSV
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
     <script src="main.js"></script>
 </body>
 </html>

@@ -74,16 +74,26 @@ let lspInflight = null;
 let lspQueue = [];
 const LSP_TIMEOUT_MS = 10000;
 
-const statusDot = document.getElementById('lsp-status');
+const STATUS_STYLES = {
+    init: { color: '#666', text: 'loading' },     // Grey
+    ready: { color: '#4CAF50', text: 'ready' },   // Green
+    busy: { color: '#FFC107', text: 'busy' },     // Yellow
+    error: { color: '#F44336', text: 'error' },   // Red
+};
+
+function setStatusDot(id, label, state) {
+    const dot = document.getElementById(id);
+    if (!dot) return;
+    dot.style.background = STATUS_STYLES[state].color;
+    dot.title = `${label}: ${STATUS_STYLES[state].text}`;
+}
 
 function updateLspStatus(state) {
-    if (!statusDot) return;
-    switch(state) {
-        case 'init': statusDot.style.background = '#666'; break; // Grey
-        case 'ready': statusDot.style.background = '#4CAF50'; break; // Green
-        case 'busy': statusDot.style.background = '#FFC107'; break; // Yellow
-        case 'error': statusDot.style.background = '#F44336'; break; // Red
-    }
+    setStatusDot('lsp-status', 'Code completion', state);
+}
+
+function updatePyStatus(state) {
+    setStatusDot('py-status', 'Python', state);
 }
 
 function settleLsp(req, result) {
@@ -447,7 +457,13 @@ function initWorker() {
     if (worker) worker.terminate();
 
     workerReady = false;
+    updatePyStatus('init');
     worker = new Worker('worker.js');
+
+    worker.onerror = (err) => {
+        console.error("[Python Worker Crash]", err);
+        updatePyStatus('error');
+    };
 
     worker.onmessage = (e) => {
         const msg = e.data;
@@ -459,6 +475,7 @@ function initWorker() {
 
             case 'init_complete':
                 workerReady = true;
+                updatePyStatus(isRunning ? 'busy' : 'ready');
                 document.getElementById('loader').style.display = 'none';
                 document.getElementById('btn-run').disabled = false;
                 if (pendingRunCode) {
@@ -479,7 +496,10 @@ function initWorker() {
                 break;
 
             case 'error':
-                if (!workerReady) document.getElementById('loader-text').textContent = msg.text;
+                if (!workerReady) {
+                    document.getElementById('loader-text').textContent = msg.text;
+                    updatePyStatus('error');
+                }
                 log(msg.text, 'err');
                 markRuntimeError(msg.text);
                 patternEnded();
@@ -523,6 +543,7 @@ function runPattern() {
 
 function executeRun(code) {
     log("--- Running ---", 'sys');
+    updatePyStatus('busy');
     worker.postMessage({ cmd: 'run', code: code });
 }
 
@@ -532,6 +553,18 @@ function patternEnded() {
     clearTimeout(stopTimer);
     stopTimer = null;
     setUIState('stopped');
+    if (workerReady) updatePyStatus('ready');
+}
+
+// Manual escape hatch: throw away the Python environment and start a fresh one
+window.restartPython = function() {
+    console.warn("[Python] Manual Restart Triggered");
+    clearTimeout(stopTimer);
+    stopTimer = null;
+    pendingRunCode = null;
+    if (isRunning) setUIState('stopped');
+    log("--- Restarting Python environment ---", 'sys');
+    initWorker();
 }
 
 function stopPattern(reason = null) {
