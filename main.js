@@ -10,6 +10,7 @@ let pendingRunCode = null;
 let isRunning = false;
 let stopTimer = null;
 
+// Single-file storage of older versions; migrated into a project by projects.js
 const STORAGE_KEY = 'jelka_saved_code';
 // How long a running pattern gets to acknowledge a soft stop before the
 // worker is terminated (and Pyodide reloaded).
@@ -355,15 +356,9 @@ require(['vs/editor/editor.main'], function() {
         }
     });
 
-    // Check Local Storage for saved code
-    let initialCode = defaultCode;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && saved.trim().length > 0) {
-        initialCode = saved;
-    }
-
+    // The active project's code (projects.js keeps all projects in localStorage)
     editor = monaco.editor.create(document.getElementById('monaco-container'), {
-        value: initialCode,
+        model: Projects.createModel(Projects.activeId()),
         language: 'python',
         theme: 'vs-dark',
         automaticLayout: false,
@@ -377,17 +372,17 @@ require(['vs/editor/editor.main'], function() {
     });
 
     // Auto-save on change (debounced), and refresh diagnostics
-    let saveTimer = null;
-    const save = () => localStorage.setItem(STORAGE_KEY, editor.getValue());
     editor.onDidChangeModelContent(() => {
-        clearTimeout(saveTimer);
-        saveTimer = setTimeout(save, 400);
+        Projects.scheduleSave();
         monaco.editor.setModelMarkers(editor.getModel(), 'runtime', []);
         scheduleDiagnostics();
     });
-    window.addEventListener('beforeunload', save);
+    window.addEventListener('beforeunload', () => Projects.flushSave());
 
     if (lspReady) scheduleDiagnostics(0);
+
+    // Open a shared project if the URL points to one
+    Projects.openFromUrl();
 });
 // --- File Operations ---
 
@@ -396,16 +391,17 @@ function downloadCode() {
     const code = editor.getValue();
     const blob = new Blob([code], { type: 'text/x-python' });
     const url = URL.createObjectURL(blob);
+    const fileName = (Projects.activeName().replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'pattern') + '.py';
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pattern.py';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
 
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    log("File downloaded as pattern.py", 'success');
+    log(`File downloaded as ${fileName}`, 'success');
 }
 
 async function loadPython(event) {
@@ -415,9 +411,9 @@ async function loadPython(event) {
     try {
         const text = await file.text();
         if (editor) {
-            editor.setValue(text);
-            localStorage.setItem(STORAGE_KEY, text); // Save immediately
-            log(`Loaded ${file.name}`, 'success');
+            // Opened files become a new project, so nothing gets overwritten
+            const project = Projects.create(file.name.replace(/\.py$/i, ''), text);
+            log(`Uploaded ${file.name} as project "${project.name}"`, 'success');
         }
     } catch (err) {
         log("Error reading python file: " + err, 'err');

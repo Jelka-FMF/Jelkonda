@@ -25,11 +25,20 @@
             <input type="file" id="csvFile" accept=".csv" onchange="loadCSV(event)">
             <input type="file" id="pyFile" accept=".py" onchange="loadPython(event)">
 
-            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Open a Python script">
-                <i class="codicon codicon-folder-opened"></i>Open
+            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Upload a .py file from your computer as a new project">
+                <i class="codicon codicon-arrow-up"></i>Upload
             </button>
-            <button class="btn" onclick="downloadCode()" title="Download the current code as pattern.py">
-                <i class="codicon codicon-save"></i>Save
+            <button class="btn" onclick="downloadCode()" title="Download the current project as a .py file">
+                <i class="codicon codicon-arrow-down"></i>Download
+            </button>
+
+            <div class="divider"></div>
+
+            <button class="btn" onclick="Projects.share()" title="Get a link to share this pattern">
+                <i class="codicon codicon-link"></i>Share
+            </button>
+            <button class="btn" onclick="Projects.submit()" title="Submit this pattern for review to be shown on the tree">
+                <i class="codicon codicon-send"></i>Submit
             </button>
 
             <div class="divider"></div>
@@ -56,7 +65,21 @@
         <!-- Editor Pane -->
         <div class="pane" id="left-pane">
             <div class="panel-header">
-                <span class="panel-title">pattern.py <span class="panel-note">auto-saved</span></span>
+                <div class="project-picker">
+                    <button id="project-button" class="icon-btn project-button" aria-haspopup="menu" aria-expanded="false" title="Switch project">
+                        <i class="codicon codicon-file-code"></i><span id="project-name"></span><i class="codicon codicon-chevron-down"></i>
+                    </button>
+                    <span class="panel-note">auto-saved</span>
+                    <div id="project-menu" class="menu" role="menu" hidden>
+                        <div class="menu-heading">Projects</div>
+                        <div id="project-list" class="menu-list"></div>
+                        <div class="menu-separator"></div>
+                        <button type="button" class="menu-item" onclick="Projects.newProject()"><i class="codicon codicon-add"></i><span class="menu-label">New project</span></button>
+                        <button type="button" class="menu-item" onclick="Projects.renameActive()"><i class="codicon codicon-edit"></i><span class="menu-label">Rename</span></button>
+                        <button type="button" class="menu-item" onclick="Projects.duplicateActive()"><i class="codicon codicon-copy"></i><span class="menu-label">Duplicate</span></button>
+                        <button type="button" class="menu-item danger" onclick="Projects.deleteActive()"><i class="codicon codicon-trash"></i><span class="menu-label">Delete</span></button>
+                    </div>
+                </div>
                 <span class="panel-actions">
                     <span id="lsp-status" class="status-dot" title="Code completion: loading"></span>
                     <button class="icon-btn" onclick="restartLsp()" title="Restart code completion (LSP)">
@@ -129,6 +152,20 @@
             </div>
         </div>
     </div>
+    <div id="dialog" class="modal" style="display: none;">
+        <form id="dialog-form" class="modal-content">
+            <div class="modal-header">
+                <h2 id="dialog-title"></h2>
+                <button type="button" class="icon-btn close" onclick="Dialog.close()" title="Close">
+                    <i class="codicon codicon-close"></i>
+                </button>
+            </div>
+            <div id="dialog-body" class="modal-body"></div>
+            <div id="dialog-actions" class="modal-actions"></div>
+        </form>
+    </div>
+
     <script src="main.js"></script>
+    <script src="projects.js"></script>
 </body>
 </html>
