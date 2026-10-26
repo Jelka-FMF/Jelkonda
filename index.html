@@ -40,22 +40,14 @@
     <div class="main-container" id="main-container">
         <!-- Editor Pane -->
         <div class="pane" id="left-pane">
-            <div class="panel-header">pattern.py (Auto-saved)</div>
+            <div class="panel-header">
+                pattern.py (Auto-saved)
+                <span id="lsp-status" title="LSP Status: Grey=Loading, Green=Ready, Yellow=Busy, Red=Error"></span>
+                <button id="lsp-restart" onclick="restartLsp()" title="Restart the code-completion engine">↺ LSP</button>
+            </div>
             <div id="monaco-container"></div>
-            
-            <!-- MOVED INSIDE LEFT PANE FOR BETTER POSITIONING -->
+
             <div class="resizer-v" id="drag-v"></div>
-            <!-- Inside <div class="pane" id="left-pane"> -->
-<div class="panel-header">
-    pattern.py (Auto-saved)
-    <!-- Status Dot -->
-    <span id="lsp-status" 
-          style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #555; margin-left: 10px;" 
-          title="LSP Status: Grey=Loading, Green=Ready, Yellow=Busy, Red=Error">
-    </span>
-    <!-- Debug Restart Button (Hidden by default or small) -->
-    <button onclick="restartLsp()" style="margin-left: 10px; background:none; border:none; color: #888; cursor: pointer; font-size: 10px;">↺ LSP</button>
-</div>
         </div>
 
         <!-- Right Pane -->

@@ -117,7 +117,17 @@ body {
     user-select: none;
 }
 
-#monaco-container { flex: 1; width: 100%; }
+#lsp-status {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: #555; margin-left: 10px;
+}
+#lsp-restart {
+    margin-left: 10px; background: none; border: none; color: #888;
+    cursor: pointer; font-size: 10px;
+}
+#lsp-restart:hover { color: var(--text); }
+
+#monaco-container { flex: 1; width: 100%; min-height: 0; }
 
 #vis-container {
     flex: 1;
@@ -153,7 +163,8 @@ canvas:active { cursor: grabbing; }
 }
 
 .log-info { color: #d4d4d4; }
-.log-err { color: #f48771; }
+.log-err { color: #f48771; white-space: pre-wrap; }
+.log-warn { color: #cca700; white-space: pre-wrap; }
 .log-sys { color: #569cd6; font-style: italic; }
 .log-success { color: #89d185; }
 
