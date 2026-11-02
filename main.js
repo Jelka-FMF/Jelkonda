@@ -64,6 +64,15 @@ window.onclick = function(event) {
     }
 }
 
+// Show the description automatically on the first visit
+const WELCOME_KEY = 'jelkonda.welcomed';
+try {
+    if (!localStorage.getItem(WELCOME_KEY)) {
+        document.getElementById('doc-modal').style.display = 'block';
+        localStorage.setItem(WELCOME_KEY, '1');
+    }
+} catch (e) { /* storage unavailable: skip the welcome */ }
+
 // --- LSP Manager ---
 // Requests are sent one at a time. While one is in flight, a newer request of
 // the same type replaces the queued older one, so fast typing never builds up
@@ -76,10 +85,10 @@ let lspQueue = [];
 const LSP_TIMEOUT_MS = 10000;
 
 const STATUS_STYLES = {
-    init: { color: '#666', text: 'loading' },     // Grey
-    ready: { color: '#4CAF50', text: 'ready' },   // Green
-    busy: { color: '#FFC107', text: 'busy' },     // Yellow
-    error: { color: '#F44336', text: 'error' },   // Red
+    init: { color: '#666', text: 'nalaganje' },       // Grey
+    ready: { color: '#4CAF50', text: 'pripravljeno' }, // Green
+    busy: { color: '#FFC107', text: 'zasedeno' },     // Yellow
+    error: { color: '#F44336', text: 'napaka' },      // Red
 };
 
 function setStatusDot(id, label, state) {
@@ -90,7 +99,7 @@ function setStatusDot(id, label, state) {
 }
 
 function updateLspStatus(state) {
-    setStatusDot('lsp-status', 'Code completion', state);
+    setStatusDot('lsp-status', 'Dopolnjevanje kode', state);
 }
 
 function updatePyStatus(state) {
@@ -391,7 +400,7 @@ function downloadCode() {
     const code = editor.getValue();
     const blob = new Blob([code], { type: 'text/x-python' });
     const url = URL.createObjectURL(blob);
-    const fileName = (Projects.activeName().replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'pattern') + '.py';
+    const fileName = (Projects.activeName().replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'vzorec') + '.py';
 
     const a = document.createElement('a');
     a.href = url;
@@ -401,7 +410,7 @@ function downloadCode() {
 
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    log(`File downloaded as ${fileName}`, 'success');
+    log(`Vzorec prenesen kot ${fileName}`, 'success');
 }
 
 async function loadPython(event) {
@@ -412,11 +421,11 @@ async function loadPython(event) {
         const text = await file.text();
         if (editor) {
             // Opened files become a new project, so nothing gets overwritten
-            const project = Projects.create(file.name.replace(/\.py$/i, ''), text);
-            log(`Uploaded ${file.name} as project "${project.name}"`, 'success');
+            Projects.create(file.name.replace(/\.py$/i, ''), text);
+            log(`Datoteka ${file.name} je naložena kot nov vzorec »${Projects.activeName()}«.`, 'success');
         }
     } catch (err) {
-        log("Error reading python file: " + err, 'err');
+        log("Napaka pri branju datoteke: " + err, 'err');
     }
     // Reset input so same file can be selected again if needed
     event.target.value = '';
@@ -439,12 +448,12 @@ async function loadCSV(event) {
 
     event.target.value = '';
     if (count === 0) {
-        log("No valid LED positions found (expected lines of: index,x,y,z)", 'err');
+        log("V datoteki ni veljavnih položajev lučk (pričakovane so vrstice oblike indeks,x,y,z).", 'err');
         return;
     }
 
     setPositions(newPositions);
-    log(`Loaded ${count} LEDs from CSV`, 'success');
+    log(`Število naloženih lučk iz CSV: ${count}`, 'success');
     updateWorkerPositions();
 }
 
@@ -502,12 +511,12 @@ function initWorker() {
                 break;
 
             case 'finished':
-                log("Script finished.", 'success');
+                log("Program se je končal.", 'success');
                 patternEnded();
                 break;
 
             case 'stopped':
-                log("--- Stopped ---", 'sys');
+                log("--- Ustavljeno ---", 'sys');
                 patternEnded();
                 break;
         }
@@ -531,14 +540,14 @@ function runPattern() {
     if (workerReady) {
         executeRun(code);
     } else {
-        log("Environment restarting...", 'sys');
+        log("Okolje se ponovno zaganja ...", 'sys');
         pendingRunCode = code;
         if (!worker) initWorker();
     }
 }
 
 function executeRun(code) {
-    log("--- Running ---", 'sys');
+    log("--- Zagon ---", 'sys');
     updatePyStatus('busy');
     worker.postMessage({ cmd: 'run', code: code });
 }
@@ -559,7 +568,7 @@ window.restartPython = function() {
     stopTimer = null;
     pendingRunCode = null;
     if (isRunning) setUIState('stopped');
-    log("--- Restarting Python environment ---", 'sys');
+    log("--- Ponovni zagon okolja Python ---", 'sys');
     initWorker();
 }
 
@@ -570,7 +579,7 @@ function stopPattern(reason = null) {
 
     if (!workerReady) {
         // Still booting, nothing to interrupt
-        log("--- Stopped ---", 'sys');
+        log("--- Ustavljeno ---", 'sys');
         setUIState('stopped');
         return;
     }
@@ -580,7 +589,7 @@ function stopPattern(reason = null) {
     worker.postMessage({ cmd: 'stop' });
     stopTimer = setTimeout(() => {
         stopTimer = null;
-        log("--- Stopped (environment restarting) ---", 'sys');
+        log("--- Ustavljeno (okolje se ponovno zaganja) ---", 'sys');
         setUIState('stopped');
         initWorker();
     }, STOP_GRACE_MS);
@@ -606,7 +615,7 @@ document.addEventListener("visibilitychange", () => {
     if (document.hidden && isRunning) {
         // When tab is hidden, browsers throttle timers and workers.
         // This causes message queues to fill up when resumed, so stop.
-        stopPattern("Simulation stopped to save resources (tab backgrounded).");
+        stopPattern("Simulacija je ustavljena, ker zavihek ni več viden.");
     }
 });
 

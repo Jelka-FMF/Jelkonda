@@ -211,7 +211,7 @@ canvas:active { cursor: grabbing; }
 .modal {
     display: none; /* Hidden by default */
     position: fixed;
-    z-index: 2000;
+    z-index: 10000; /* above the loader, so the welcome text can be read while Python loads */
     left: 0;
     top: 0;
     width: 100%;
@@ -337,6 +337,7 @@ canvas:active { cursor: grabbing; }
 .menu-item.danger:hover { background: #a1260d; }
 .menu-item .codicon { font-size: 14px; flex-shrink: 0; }
 .menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unnamed { font-style: italic; opacity: 0.75; }
 
 /* --- Dialogs --- */
 #dialog-form { width: 480px; }

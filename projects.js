@@ -25,7 +25,7 @@ function storageRemove(key) {
 // --- Backend (Jelkob) ---
 // For local development, point Jelkonda at another backend with:
 //   localStorage.setItem('jelkonda.apiBase', 'http://localhost:8001')
-const API_BASE = (storageGet('jelkonda.apiBase') || 'https://jelkob.fmf.uni-lj.si').replace(/\/+$/, '');
+const API_BASE = (storageGet('jelkonda.apiBase') || 'https://jelka.fmf.uni-lj.si').replace(/\/+$/, '');
 
 class ApiError extends Error {}
 
@@ -188,8 +188,12 @@ function shareLink(url) {
 const PROJECT_INDEX_KEY = 'jelkonda.projects';
 const PROJECT_SOURCE_PREFIX = 'jelkonda.source.';
 const AUTHOR_KEY = 'jelkonda.author';
-const DEFAULT_PROJECT_NAME = 'vzorec';
+// Projects start without a name; the UI shows UNNAMED_LABEL instead, and the
+// share/submit forms leave the name input empty until one is chosen.
+const UNNAMED_LABEL = 'Neimenovan vzorec';
 const MAX_NAME_LENGTH = 50;
+
+const displayName = (project) => project.name || UNNAMED_LABEL;
 
 // Cheap fingerprint (FNV-1a) of what was last uploaded, to reuse a share link
 // when nothing changed since.
@@ -204,8 +208,9 @@ function contentHash(name, source) {
 }
 
 const Projects = (() => {
-    // { active: id, projects: [{ id, name, created, updated, shared: { id, url, hash } | null }] }
-    let index = { active: null, projects: [] };
+    // { version, active: id, projects: [{ id, name, created, updated, shared: { id, url, hash } | null }] }
+    // name is '' for a project that was never named.
+    let index = { version: 2, active: null, projects: [] };
     let saveTimer = null;
     let saveTarget = null;
     let saveFailed = false;
@@ -221,7 +226,8 @@ const Projects = (() => {
     const persistIndex = () => storageSet(PROJECT_INDEX_KEY, JSON.stringify(index));
 
     function uniqueName(base, exceptId = null) {
-        base = (base || DEFAULT_PROJECT_NAME).trim().slice(0, MAX_NAME_LENGTH) || DEFAULT_PROJECT_NAME;
+        base = (base || '').trim().slice(0, MAX_NAME_LENGTH);
+        if (!base) return '';
         const taken = new Set(index.projects.filter(p => p.id !== exceptId).map(p => p.name));
         if (!taken.has(base)) return base;
         for (let i = 2; ; i++) {
@@ -236,10 +242,19 @@ const Projects = (() => {
             if (parsed && Array.isArray(parsed.projects)) index = parsed;
         } catch (e) { /* no or corrupt index: start fresh */ }
 
+        // Version 1 gave new projects the default name "vzorec" ("vzorec (2)", ...);
+        // treat those as unnamed now.
+        if (!index.version || index.version < 2) {
+            for (const p of index.projects) {
+                if (/^vzorec( \(\d+\))?$/.test(p.name)) p.name = '';
+            }
+            index.version = 2;
+        }
+
         if (index.projects.length === 0) {
             // First start, or upgrading from the single-file version
             const legacy = storageGet(STORAGE_KEY);
-            add(DEFAULT_PROJECT_NAME, legacy && legacy.trim() ? legacy : defaultCode);
+            add('', legacy && legacy.trim() ? legacy : defaultCode);
         }
         if (!active()) index.active = index.projects[0].id;
         persistIndex();
@@ -290,7 +305,7 @@ const Projects = (() => {
         project.updated = Date.now();
         persistIndex();
 
-        if (!ok && !saveFailed) log("Shranjevanje v brskalnik ni uspelo (zmanjkalo je prostora?). Prenesite kodo z gumbom Download.", 'err');
+        if (!ok && !saveFailed) log("Shranjevanje v brskalnik ni uspelo (zmanjkalo je prostora?). Prenesite kodo z gumbom Prenesi.", 'err');
         saveFailed = !ok;
     }
 
@@ -312,7 +327,7 @@ const Projects = (() => {
         index.projects.splice(i, 1);
         storageRemove(PROJECT_SOURCE_PREFIX + id);
 
-        if (index.projects.length === 0) add(DEFAULT_PROJECT_NAME, defaultCode);
+        if (index.projects.length === 0) add('', defaultCode);
         if (index.active === id) {
             const next = [...index.projects].sort((a, b) => b.updated - a.updated)[0];
             index.active = null;
@@ -335,8 +350,9 @@ const Projects = (() => {
 
     function render() {
         const current = active();
-        document.getElementById('project-name').textContent = current.name;
-        document.title = `${current.name} · Jelkonda`;
+        document.getElementById('project-name').textContent = displayName(current);
+        document.getElementById('project-name').classList.toggle('unnamed', !current.name);
+        document.title = `${displayName(current)} · Jelkonda`;
 
         const list = document.getElementById('project-list');
         list.replaceChildren(...[...index.projects]
@@ -345,7 +361,7 @@ const Projects = (() => {
                 type: 'button',
                 class: 'menu-item' + (p.id === current.id ? ' active' : ''),
                 onclick: () => { closeMenu(); switchTo(p.id); },
-            }, [icon(p.id === current.id ? 'check' : 'blank'), el('span', { class: 'menu-label' }, p.name)])));
+            }, [icon(p.id === current.id ? 'check' : 'blank'), el('span', { class: 'menu-label' + (p.name ? '' : ' unnamed') }, displayName(p))])));
     }
 
     function openMenu() {
@@ -370,8 +386,8 @@ const Projects = (() => {
     function nameDialog(heading, initial, confirmLabel, onConfirm) {
         Dialog.show({
             heading,
-            content: field("Ime projekta",
-                el('input', { name: 'name', class: 'input', required: true, maxlength: MAX_NAME_LENGTH, value: initial, autocomplete: 'off' })),
+            content: field("Ime vzorca",
+                el('input', { name: 'name', class: 'input', maxlength: MAX_NAME_LENGTH, value: initial, placeholder: UNNAMED_LABEL, autocomplete: 'off' })),
             buttons: [
                 { label: "Prekliči", onClick: Dialog.close },
                 { label: confirmLabel, primary: true, submit: true },
@@ -385,28 +401,28 @@ const Projects = (() => {
 
     function newProject() {
         closeMenu();
-        nameDialog("Nov projekt", uniqueName(DEFAULT_PROJECT_NAME), "Ustvari", (name) => create(name, defaultCode));
+        nameDialog("Nov vzorec", '', "Ustvari", (name) => create(name, defaultCode));
     }
 
     function renameActive() {
         closeMenu();
         const current = active();
-        nameDialog("Preimenuj projekt", current.name, "Preimenuj", (name) => rename(current.id, name));
+        nameDialog("Preimenuj vzorec", current.name, "Preimenuj", (name) => rename(current.id, name));
     }
 
     function duplicateActive() {
         closeMenu();
         flushSave();
         const current = active();
-        create(`${current.name} (kopija)`, sourceOf(current.id));
+        create(current.name ? `${current.name} (kopija)` : '', sourceOf(current.id));
     }
 
     function deleteActive() {
         closeMenu();
         const current = active();
         Dialog.show({
-            heading: "Izbriši projekt",
-            content: el('p', {}, [`Projekt »${current.name}« bo trajno izbrisan iz tega brskalnika. `,
+            heading: "Izbriši vzorec",
+            content: el('p', {}, [`Vzorec »${displayName(current)}« bo trajno izbrisan iz tega brskalnika. `,
                 "Deljene povezave in oddani vzorci ostanejo na strežniku."]),
             buttons: [
                 { label: "Prekliči", onClick: Dialog.close },
@@ -454,9 +470,9 @@ const Projects = (() => {
         Dialog.show({
             heading: "Deli vzorec",
             content: [
-                el('p', {}, "Vzorec bo naložen na strežnik in dobili boste povezavo, s katero ga lahko delite z drugimi. S tem vzorec ne bo oddan v pregled."),
+                el('p', {}, "Vzorec bo naložen na strežnik. Dobili boste povezavo, s katero ga lahko delite z drugimi. S tem vzorec še ne bo oddan v pregled."),
                 field("Ime vzorca",
-                    el('input', { name: 'name', class: 'input', required: true, maxlength: MAX_NAME_LENGTH, value: current.name, autocomplete: 'off' })),
+                    el('input', { name: 'name', class: 'input', required: true, maxlength: MAX_NAME_LENGTH, value: current.name, placeholder: "Vnesite ime vzorca", autocomplete: 'off' })),
             ],
             buttons: [
                 { label: "Prekliči", onClick: Dialog.close },
@@ -464,6 +480,7 @@ const Projects = (() => {
             ],
             submit: async (data) => {
                 const name = data.get('name').trim();
+                if (!name) return Dialog.showError("Vnesite ime vzorca.");
                 Dialog.setBusy("Nalagam vzorec ...");
                 try {
                     if (name !== current.name) rename(current.id, name);
@@ -484,7 +501,7 @@ const Projects = (() => {
             content: [
                 el('p', {}, "S to povezavo lahko svoj vzorec delite naprej:"),
                 shareLink(url),
-                el('p', { class: 'field-hint' }, "Povezava kaže na trenutno različico. Če vzorec spremenite, ga delite ponovno za novo povezavo."),
+                el('p', { class: 'field-hint' }, "Povezava kaže na trenutno različico. Če vzorec spremenite, ga ponovno delite za novo povezavo."),
             ],
             buttons: [{ label: "Zapri", primary: true, onClick: Dialog.close }],
         });
@@ -509,12 +526,12 @@ const Projects = (() => {
                 field("Ime vzorca",
                     el('input', { name: 'name', class: 'input', required: true, maxlength: MAX_NAME_LENGTH, value: current.name, placeholder: "Vnesite ime vzorca", autocomplete: 'off' })),
                 field("Opis vzorca",
-                    el('textarea', { name: 'description', class: 'input', required: true, maxlength: 200, rows: 3, placeholder: "Vnesite opis vzorca" })),
+                    el('textarea', { name: 'description', class: 'input', maxlength: 200, rows: 3, placeholder: "Vnesite opis vzorca (neobvezno)" })),
                 el('div', { class: 'field-row' }, [
                     field("Vaše ime",
-                        el('input', { name: 'author', class: 'input', maxlength: 50, value: author.author || '', placeholder: "Vnesite svoje ime", autocomplete: 'name' })),
+                        el('input', { name: 'author', class: 'input', maxlength: 50, value: author.author || '', placeholder: "Vnesite svoje ime (neobvezno)", autocomplete: 'name' })),
                     field("Vaša šola",
-                        el('input', { name: 'school', class: 'input', maxlength: 100, value: author.school || '', placeholder: "Vnesite svojo šolo", autocomplete: 'organization' })),
+                        el('input', { name: 'school', class: 'input', maxlength: 100, value: author.school || '', placeholder: "Vnesite svojo šolo (neobvezno)", autocomplete: 'organization' })),
                 ]),
                 el('label', { class: 'checkbox' }, [
                     el('input', { type: 'checkbox', name: 'confirm', required: true }),
@@ -532,6 +549,7 @@ const Projects = (() => {
                     author: data.get('author').trim(),
                     school: data.get('school').trim(),
                 };
+                if (!fields.name) return Dialog.showError("Vnesite ime vzorca.");
                 storageSet(AUTHOR_KEY, JSON.stringify({ author: fields.author, school: fields.school }));
 
                 Dialog.setBusy("Počakajte, da bo vaš vzorec oddan ...");
@@ -574,7 +592,7 @@ const Projects = (() => {
             const data = await api.get(id);
             const remoteId = String(data.id ?? id);
             const source = data.source ?? '';
-            const name = data.name || "deljeni vzorec";
+            const name = data.name || '';
 
             // Opening the same link twice should not create duplicates
             const existing = index.projects.find(p => p.shared && p.shared.id === remoteId && sourceOf(p.id) === source);
@@ -586,7 +604,7 @@ const Projects = (() => {
                 persistIndex();
                 switchTo(project.id);
             }
-            log(`Naložen deljeni vzorec »${active().name}«.`, 'success');
+            log(`Naložen deljeni vzorec »${displayName(active())}«.`, 'success');
 
             // Drop the parameter so the address bar shows the plain editor
             query.delete('project');
@@ -611,6 +629,6 @@ const Projects = (() => {
         load, render, createModel, scheduleSave, flushSave, create, switchTo, openFromUrl,
         newProject, renameActive, duplicateActive, deleteActive, share, submit,
         activeId: () => index.active,
-        activeName: () => active().name,
+        activeName: () => displayName(active()),
     };
 })();

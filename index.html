@@ -1,10 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jelkonda</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <meta name="theme-color" content="#010028">
+    <meta name="application-name" content="Jelkonda">
+    <meta name="description" content="Spletni Python urejevalnik za izdelavo vzorcev za Jelko FMF">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Jelkonda">
+    <meta name="twitter:description" content="Spletni Python urejevalnik za izdelavo vzorcev za Jelko FMF">
+    <meta name="twitter:image" content="social-icon-square.png">
+    <meta property="og:site_name" content="Jelkonda">
+    <meta property="og:title" content="Jelkonda">
+    <meta property="og:description" content="Spletni Python urejevalnik za izdelavo vzorcev za Jelko FMF">
+    <meta property="og:image" content="social-icon-wide.png">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1280">
+    <meta property="og:image:height" content="640">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="icon" type="image/x-icon" sizes="256x256" href="favicon.ico">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="favicon.svg">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css">
     <link rel="stylesheet" href="style.css">
     <script src="positions.js"></script>
@@ -13,7 +29,7 @@
 <body>
     <div id="loader">
         <div class="spinner"></div>
-        <div id="loader-text">Initializing Python Environment...</div>
+        <div id="loader-text">Nalagam okolje Python ...</div>
     </div>
 
     <div class="header">
@@ -25,37 +41,37 @@
             <input type="file" id="csvFile" accept=".csv" onchange="loadCSV(event)">
             <input type="file" id="pyFile" accept=".py" onchange="loadPython(event)">
 
-            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Upload a .py file from your computer as a new project">
-                <i class="codicon codicon-arrow-up"></i>Upload
+            <button class="btn" onclick="document.getElementById('pyFile').click()" title="Naloži datoteko .py z računalnika kot nov vzorec">
+                <i class="codicon codicon-arrow-up"></i>Naloži
             </button>
-            <button class="btn" onclick="downloadCode()" title="Download the current project as a .py file">
-                <i class="codicon codicon-arrow-down"></i>Download
-            </button>
-
-            <div class="divider"></div>
-
-            <button class="btn" onclick="Projects.share()" title="Get a link to share this pattern">
-                <i class="codicon codicon-link"></i>Share
-            </button>
-            <button class="btn" onclick="Projects.submit()" title="Submit this pattern for review to be shown on the tree">
-                <i class="codicon codicon-send"></i>Submit
+            <button class="btn" onclick="downloadCode()" title="Prenesi trenutni vzorec kot datoteko .py">
+                <i class="codicon codicon-arrow-down"></i>Prenesi
             </button>
 
             <div class="divider"></div>
 
-            <button id="btn-run" class="btn btn-run" onclick="runPattern()" title="Run (Ctrl/Cmd+Enter)" disabled>
-                <i class="codicon codicon-play"></i>Run
+            <button class="btn" onclick="Projects.share()" title="Ustvari povezavo, s katero lahko vzorec deliš z drugimi">
+                <i class="codicon codicon-link"></i>Deli
             </button>
-            <button id="btn-stop" class="btn btn-stop" onclick="stopPattern()" title="Stop (Ctrl/Cmd+Enter)" disabled>
-                <i class="codicon codicon-debug-stop"></i>Stop
+            <button class="btn" onclick="Projects.submit()" title="Oddaj vzorec v pregled za prikaz na jelki">
+                <i class="codicon codicon-send"></i>Oddaj
             </button>
 
             <div class="divider"></div>
 
-            <button class="btn" onclick="resetView()" title="Reset the camera to the default angle and zoom">
-                <i class="codicon codicon-screen-normal"></i>Reset view
+            <button id="btn-run" class="btn btn-run" onclick="runPattern()" title="Zaženi (Ctrl/Cmd+Enter)" disabled>
+                <i class="codicon codicon-play"></i>Zaženi
             </button>
-            <button class="btn btn-icon" onclick="toggleDocs()" title="Help">
+            <button id="btn-stop" class="btn btn-stop" onclick="stopPattern()" title="Ustavi (Ctrl/Cmd+Enter)" disabled>
+                <i class="codicon codicon-debug-stop"></i>Ustavi
+            </button>
+
+            <div class="divider"></div>
+
+            <button class="btn" onclick="resetView()" title="Ponastavi kot in povečavo pogleda na jelko">
+                <i class="codicon codicon-screen-normal"></i>Ponastavi pogled
+            </button>
+            <button class="btn btn-icon" onclick="toggleDocs()" title="O Jelkondi">
                 <i class="codicon codicon-question"></i>
             </button>
         </div>
@@ -66,23 +82,23 @@
         <div class="pane" id="left-pane">
             <div class="panel-header">
                 <div class="project-picker">
-                    <button id="project-button" class="icon-btn project-button" aria-haspopup="menu" aria-expanded="false" title="Switch project">
+                    <button id="project-button" class="icon-btn project-button" aria-haspopup="menu" aria-expanded="false" title="Zamenjaj vzorec">
                         <i class="codicon codicon-file-code"></i><span id="project-name"></span><i class="codicon codicon-chevron-down"></i>
                     </button>
-                    <span class="panel-note">auto-saved</span>
+                    <span class="panel-note">samodejno shranjeno</span>
                     <div id="project-menu" class="menu" role="menu" hidden>
-                        <div class="menu-heading">Projects</div>
+                        <div class="menu-heading">Vzorci</div>
                         <div id="project-list" class="menu-list"></div>
                         <div class="menu-separator"></div>
-                        <button type="button" class="menu-item" onclick="Projects.newProject()"><i class="codicon codicon-add"></i><span class="menu-label">New project</span></button>
-                        <button type="button" class="menu-item" onclick="Projects.renameActive()"><i class="codicon codicon-edit"></i><span class="menu-label">Rename</span></button>
-                        <button type="button" class="menu-item" onclick="Projects.duplicateActive()"><i class="codicon codicon-copy"></i><span class="menu-label">Duplicate</span></button>
-                        <button type="button" class="menu-item danger" onclick="Projects.deleteActive()"><i class="codicon codicon-trash"></i><span class="menu-label">Delete</span></button>
+                        <button type="button" class="menu-item" onclick="Projects.newProject()"><i class="codicon codicon-add"></i><span class="menu-label">Nov vzorec</span></button>
+                        <button type="button" class="menu-item" onclick="Projects.renameActive()"><i class="codicon codicon-edit"></i><span class="menu-label">Preimenuj</span></button>
+                        <button type="button" class="menu-item" onclick="Projects.duplicateActive()"><i class="codicon codicon-copy"></i><span class="menu-label">Podvoji</span></button>
+                        <button type="button" class="menu-item danger" onclick="Projects.deleteActive()"><i class="codicon codicon-trash"></i><span class="menu-label">Izbriši</span></button>
                     </div>
                 </div>
                 <span class="panel-actions">
-                    <span id="lsp-status" class="status-dot" title="Code completion: loading"></span>
-                    <button class="icon-btn" onclick="restartLsp()" title="Restart code completion (LSP)">
+                    <span id="lsp-status" class="status-dot" title="Dopolnjevanje kode: nalaganje"></span>
+                    <button class="icon-btn" onclick="restartLsp()" title="Ponovno zaženi dopolnjevanje kode (LSP)">
                         <i class="codicon codicon-debug-restart"></i>LSP
                     </button>
                 </span>
@@ -96,7 +112,7 @@
         <div class="pane" id="right-pane">
             <div id="vis-container">
                 <canvas id="canvas"></canvas>
-                <div class="vis-hint">Drag to rotate · Scroll to zoom</div>
+                <div class="vis-hint">Povleci za vrtenje · Kolešček za povečavo</div>
             </div>
 
             <!-- Horizontal Resizer -->
@@ -106,11 +122,11 @@
                 <div class="panel-header">
                     <span class="panel-title">Terminal</span>
                     <span class="panel-actions">
-                        <button class="icon-btn" onclick="clearConsole()" title="Clear the terminal">
+                        <button class="icon-btn" onclick="clearConsole()" title="Počisti terminal">
                             <i class="codicon codicon-clear-all"></i>
                         </button>
-                        <span id="py-status" class="status-dot" title="Python: loading"></span>
-                        <button class="icon-btn" onclick="restartPython()" title="Restart the Python environment">
+                        <span id="py-status" class="status-dot" title="Python: nalaganje"></span>
+                        <button class="icon-btn" onclick="restartPython()" title="Ponovno zaženi okolje Python">
                             <i class="codicon codicon-debug-restart"></i>Python
                         </button>
                     </span>
@@ -123,27 +139,28 @@
     <div id="doc-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <div class="modal-header">
-                <h2><img src="favicon.svg" alt="" class="brand-logo">Jelkonda - Urejevalnik za FMF Jelko</h2>
-                <button class="icon-btn close" onclick="toggleDocs()" title="Close">
+                <h2><img src="favicon.svg" alt="" class="brand-logo">Jelkonda – Spletni Python urejevalnik za Jelko FMF</h2>
+                <button class="icon-btn close" onclick="toggleDocs()" title="Zapri">
                     <i class="codicon codicon-close"></i>
                 </button>
             </div>
             <div class="modal-body">
                 <p>
-                    Jelkonda je urejevalnik za python za programiranje <a href="https://jelka.fmf.uni-lj.si/">programabilne jelke</a>, ki je postavljena na Fakuleteti za Matematiko in Fiziko Univerze v Ljubljani.
+                    Jelkonda je spletni Python urejevalnik za programiranje <a href="https://jelka.fmf.uni-lj.si/">programabilne jelke</a>, ki je postavljena na Fakulteti za matematiko in fiziko Univerze v Ljubljani.
                 </p>
                 <p>
-                    Knjižnica, ki jo lahko uporabljate je definirana v <a href="https://github.com/Jelka-FMF/JelkaPy">Github repozitoriju</a>. Za inspiracijo in dopolnitev nepopolne dokumentacije predlagamo ogled že <a href="https://github.com/Jelka-FMF/Storzi/tree/main/patterns">narejenih vzorcev</a>.
+                    Knjižnica za delo z jelko je na voljo v <a href="https://github.com/Jelka-FMF/JelkaPy">repozitoriju na GitHubu</a>, kjer je objavljena tudi njena osnovna dokumentacija.
+                    Za navdih in lažje razumevanje delovanja predlagamo tudi ogled <a href="https://github.com/Jelka-FMF/Storzi">že ustvarjenih vzorcev</a>.
                 </p>
                 <p>
-                    Ko boste z vzorcem zadovoljni, ga lahko oddate s pomočjo PR zahteve na Github repozitoriju <a href="https://github.com/Jelka-FMF/Storzi">storži</a>, ali pa ga pošljete po e-mailu na naslov jk36975 afna student[pika]uni-lj[pika]si.
+                    Ko boste z vzorcem zadovoljni, ga lahko oddate prek obrazca v urejevalniku.
                 </p>
 
                 <h3>Napredno</h3>
                 <div class="setting">
                     <div>
-                        <div class="setting-title">Pozicije lučk</div>
-                        <div class="setting-desc">Uvozi CSV datoteko z vrsticami oblike <code>indeks,x,y,z</code>. Privzeto se uporabljajo pozicije FMF jelke.</div>
+                        <div class="setting-title">Uvoz položajev lučk</div>
+                        <div class="setting-desc">Uvozi CSV datoteko s položaji lučk z vrsticami oblike <code>indeks,x,y,z</code>. Privzeto se uporabljajo položaji jelke na FMF.</div>
                     </div>
                     <button class="btn" onclick="document.getElementById('csvFile').click()">
                         <i class="codicon codicon-cloud-upload"></i>Uvozi CSV
@@ -156,7 +173,7 @@
         <form id="dialog-form" class="modal-content">
             <div class="modal-header">
                 <h2 id="dialog-title"></h2>
-                <button type="button" class="icon-btn close" onclick="Dialog.close()" title="Close">
+                <button type="button" class="icon-btn close" onclick="Dialog.close()" title="Zapri">
                     <i class="codicon codicon-close"></i>
                 </button>
             </div>

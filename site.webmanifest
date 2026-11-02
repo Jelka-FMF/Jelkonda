@@ -1,0 +1,28 @@
+{
+  "name": "Jelkonda",
+  "description": "Spletni Python urejevalnik za izdelavo vzorcev za Jelko FMF",
+  "lang": "sl",
+  "display": "standalone",
+  "theme_color": "#010028",
+  "start_url": "./",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "favicon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    },
+    {
+      "src": "favicon-monochrome.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "monochrome"
+    }
+  ]
+}

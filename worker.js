@@ -32,7 +32,7 @@ async function initPyodideEnvironment() {
         // Start fetching config while Pyodide boots
         const posPromise = fetch("positions.csv").then(r => r.ok ? r.text() : null);
         const libsPromise = fetch("libraries.json").then(r => {
-            if (!r.ok) throw new Error("Missing libraries.json - Run setup.py!");
+            if (!r.ok) throw new Error("Manjka libraries.json (zaženite setup.py).");
             return r.json();
         });
 
@@ -177,14 +177,14 @@ async def run_user(code):
     flush_all()
     return [status, text]
 
-print("[System] Environment Ready.")
+print("[Sistem] Okolje je pripravljeno.")
 flush_all()
         `);
 
         postMessage({type: 'ready'});
 
     } catch (e) {
-        postMessage({type: 'error', text: "System Init Error: " + e.toString()});
+        postMessage({type: 'error', text: "Napaka pri zagonu okolja: " + e.toString()});
     }
 }
 
@@ -222,7 +222,7 @@ async function loadImportedPackages(code) {
     if (needed.length === 0) return;
 
     await pyodide.loadPackage(needed, {
-        messageCallback: (m) => postMessage({type: 'print', text: m, stream: 'sys'}),
+        messageCallback: (m) => postMessage({type: 'print', text: m.replace(/^Loading /, 'Nalagam paket: ').replace(/^Loaded /, 'Naloženo: '), stream: 'sys'}),
         errorCallback: (m) => postMessage({type: 'print', text: m, stream: 'stderr'}),
     });
 }
